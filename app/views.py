@@ -5,8 +5,12 @@ Werkzeug Documentation:  https://werkzeug.palletsprojects.com/
 This file creates your application.
 """
 
-from app import app
-from flask import render_template, request, jsonify, send_file
+from app import app, db
+from flask import render_template, request, jsonify, send_file, send_from_directory
+from app.forms import MovieForm
+from app.models import Movie
+from flask_wtf.csrf import generate_csrf
+from werkzeug.utils import secure_filename
 import os
 
 
@@ -20,11 +24,69 @@ def index():
 
 
 ###
+# API Routes
+###
+
+@app.route('/api/v1/csrf-token', methods=['GET'])
+def get_csrf():
+    return jsonify({'csrf_token': generate_csrf()})
+
+
+@app.route('/api/v1/movies', methods=['POST'])
+def movies():
+    form = MovieForm()
+
+    if form.validate_on_submit():
+        title = form.title.data
+        description = form.description.data
+        poster_file = form.poster.data
+
+        upload_dir = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+        os.makedirs(upload_dir, exist_ok=True)
+
+        filename = secure_filename(poster_file.filename)
+        poster_file.save(os.path.join(upload_dir, filename))
+
+        new_movie = Movie(title=title, description=description, poster=filename)
+        db.session.add(new_movie)
+        db.session.commit()
+
+        return jsonify({
+            "message": "Movie Successfully added",
+            "title": title,
+            "poster": filename,
+            "description": description
+        }), 201
+
+    errors = form_errors(form)
+    return jsonify({"errors": errors}), 400
+
+
+@app.route('/api/v1/movies', methods=['GET'])
+def get_movies():
+    all_movies = Movie.query.order_by(Movie.created_at.desc()).all()
+    movies_list = [
+        {
+            "id": m.id,
+            "title": m.title,
+            "description": m.description,
+            "poster": f"/api/v1/posters/{m.poster}"
+        }
+        for m in all_movies
+    ]
+    return jsonify({"movies": movies_list}), 200
+
+
+@app.route('/api/v1/posters/<filename>', methods=['GET'])
+def get_poster(filename):
+    upload_dir = os.path.join(app.root_path, app.config['UPLOAD_FOLDER'])
+    return send_from_directory(upload_dir, filename)
+
+
+###
 # The functions below should be applicable to all Flask apps.
 ###
 
-# Here we define a function to collect form errors from Flask-WTF
-# which we can later use
 def form_errors(form):
     error_messages = []
     """Collects form errors"""
@@ -37,6 +99,7 @@ def form_errors(form):
             error_messages.append(message)
 
     return error_messages
+
 
 @app.route('/<file_name>.txt')
 def send_text_file(file_name):
