@@ -31,6 +31,3 @@ coverage
 __pycache__
 venv
 
-# Environment Variables
-.env
-.flaskenvapp/uploads/ 
