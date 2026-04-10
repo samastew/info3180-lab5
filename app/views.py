@@ -58,6 +58,8 @@ def movies():
             "description": description
         }), 201
 
+    # form_errors returns a list of plain strings e.g.
+    # ["Error in the Movie Title field - This field is required."]
     errors = form_errors(form)
     return jsonify({"errors": errors}), 400
 

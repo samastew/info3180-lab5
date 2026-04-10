@@ -15,4 +15,4 @@ migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
 
 from app import views, models
- # noqa: E402, F401
+ 
